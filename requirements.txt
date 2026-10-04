@@ -1,0 +1,12 @@
+# Single-object image identification — dependencies
+# Install:  pip install -r requirements.txt
+# Tested with Python 3.12 on macOS (Apple Silicon / MPS); works on CUDA and CPU too.
+torch==2.14.1
+torchvision==0.29.1
+numpy==2.5.3
+pandas==3.0.6
+scikit-learn==1.9.1
+matplotlib==3.11.2
+Pillow==12.3.0
+optuna==5.0.0
+certifi==2026.7.22
