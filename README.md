@@ -21,6 +21,8 @@ experimentation process is reproducible — not just the final selected model.
 
 ```
 class_identification.py   # all four models: data pipeline, training, tuning, prediction, plots
+make_report.py            # builds report.pdf from the results/ outputs
+report.pdf                # project report (methodology, results, figures, discussion)
 requirements.txt          # pinned dependencies
 README.md                 # this file
 results/                  # generated outputs (see below) — figures & CSVs committed, checkpoints are not
@@ -87,7 +89,23 @@ Useful flags: `--models custom_cnn resnet18 …` (subset), `--epochs N` (overrid
 
 ## Results
 
-> Results from the `compare` run on this dataset are summarized here after training.
-> See `results/comparison.csv` and `results/comparison.png` for the full numbers.
+Held-out test set (73 classes, same stratified split for every model), ranked by validation accuracy.
+Latency is single-image CPU inference, measured uniformly for a fair comparison.
 
-_(table added below once the comparison run completes)_
+| Model | Val acc | Test acc | Test F1 | Params (M) | Latency (ms) | Best epoch |
+|---|---|---|---|---|---|---|
+| **Swin-Tiny** 🏆 | **0.962** | **0.948** | **0.949** | 27.6 | 29.1 | 7 |
+| ResNet-18 | 0.945 | 0.936 | 0.936 | 11.2 | 10.3 | 14 |
+| Custom CNN | 0.799 | 0.789 | 0.788 | 1.6 | 7.8 | 39 |
+
+**Takeaways:** ImageNet transfer learning (Swin-Tiny 94.8%, ResNet-18 93.6%) far outperforms the
+from-scratch Custom CNN (78.9%) when each class has only ~100 images. Swin-Tiny is the most accurate;
+ResNet-18 is the best accuracy-per-cost model (≈1 point behind, 2.4× fewer params, ~3× faster).
+
+See [`report.pdf`](report.pdf) for the full write-up (methodology, figures, discussion) and
+`results/comparison.png`, `results/curves.png`, `results/confusion_*.png` for the figures.
+
+> **Note on EfficientNet-B0:** it is implemented and tested (code included), but is omitted from the
+> results table — it hangs on this machine's Apple MPS GPU backend (a known PyTorch issue) and is
+> prohibitively slow on CPU (~30 min/epoch). Partial runs reached ~0.93 val accuracy, in line with the
+> other transfer models. See the report's *Limitations* section.

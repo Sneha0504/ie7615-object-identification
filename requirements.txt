@@ -10,3 +10,4 @@ matplotlib==3.11.2
 Pillow==12.3.0
 optuna==5.0.0
 certifi==2026.7.22
+reportlab==5.0.1          # only for make_report.py (PDF report)
