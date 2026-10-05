@@ -1,9 +1,8 @@
-"""Single-object image ID: train, compare and tune four classifiers.
+"""Single-object image ID: train, compare and tune three classifiers.
 
 Models
     custom_cnn       CNN trained from scratch; architecture + hyperparameters tuned with Optuna
     resnet18         ImageNet-pretrained, transfer learning
-    efficientnet_b0  ImageNet-pretrained, transfer learning
     swin_t           ImageNet-pretrained (Swin-Tiny), transfer learning
 
 Data
@@ -87,7 +86,6 @@ DEVICE = pick_device()
 DEFAULTS = {
     "custom_cnn":      dict(epochs=40, lr=1e-3, backbone_mult=1.0, weight_decay=1e-4, batch_size=32),
     "resnet18":        dict(epochs=15, lr=1e-3, backbone_mult=0.1, weight_decay=1e-4, batch_size=32),
-    "efficientnet_b0": dict(epochs=15, lr=1e-3, backbone_mult=0.1, weight_decay=1e-4, batch_size=32),
     "swin_t":          dict(epochs=15, lr=1e-3, backbone_mult=0.1, weight_decay=1e-4, batch_size=32),
 }
 
@@ -112,7 +110,6 @@ TUNE_EPOCHS = None                  # None -> same epochs as compare (DEFAULTS),
 MODEL_COLORS = {
     "custom_cnn":      "#2a78d6",   # blue
     "resnet18":        "#eb6834",   # orange
-    "efficientnet_b0": "#1baf7a",   # aqua green
     "swin_t":          "#eda100",   # amber yellow
 }
 INK = "#0b0b0b"                     # near-black: titles
@@ -284,7 +281,6 @@ class CustomCNN(nn.Module):
 # ImageNet-pretrained weights per transfer model (also the source of their mean / std)
 WEIGHTS = {
     "resnet18": models.ResNet18_Weights.DEFAULT,
-    "efficientnet_b0": models.EfficientNet_B0_Weights.DEFAULT,
     "swin_t": models.Swin_T_Weights.DEFAULT,
 }
 
@@ -298,10 +294,6 @@ def build_model(name, num_classes, arch=None):
         m = models.resnet18(weights=WEIGHTS[name])
         m.fc = nn.Linear(m.fc.in_features, num_classes)
         return m, list(m.fc.parameters())
-    if name == "efficientnet_b0":
-        m = models.efficientnet_b0(weights=WEIGHTS[name])
-        m.classifier[-1] = nn.Linear(m.classifier[-1].in_features, num_classes)
-        return m, list(m.classifier.parameters())
     if name == "swin_t":
         m = models.swin_t(weights=WEIGHTS[name])
         m.head = nn.Linear(m.head.in_features, num_classes)

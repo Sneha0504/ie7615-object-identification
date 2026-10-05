@@ -1,34 +1,34 @@
-# Single-Object Image Identification (73 classes)
+# Discriminative Project — Milestone 1 (Study Group 9)
 
-Course project for **IE7615 — Deep Learning for AI**. The task is to identify which
-single object (`OBJ001` … `OBJ073`) appears in a 224×224 photo. We train a custom CNN
-from scratch and three ImageNet-pretrained transfer-learning backbones, then compare
-them on a held-out test split.
+Single-object image identification across **73 object classes** (`OBJ001` … `OBJ073`).
+Given a 224×224 photo, the model predicts which object it shows. We train one CNN from
+scratch and two ImageNet-pretrained backbones (transfer learning), then compare them on a
+held-out test split.
 
-## Models compared
+**Repository:** https://github.com/Sneha0504/ie7615-object-identification
 
-All four are implemented in [`class_identification.py`](class_identification.py) so the full
-experimentation process is reproducible — not just the final selected model.
+## Models
 
-| Key | Model | How it's trained |
-|-----|-------|------------------|
-| `custom_cnn` | CNN built from scratch | `n_blocks × [conv-BN-ReLU]*k + maxpool` → global-avg-pool → dropout → linear. Architecture + hyperparameters are tunable with Optuna (`tune_cnn`). |
-| `resnet18` | ResNet-18 (ImageNet) | Transfer learning: new linear head, backbone fine-tuned at a lower LR. |
-| `efficientnet_b0` | EfficientNet-B0 (ImageNet) | Transfer learning: new classifier head + fine-tuning. |
-| `swin_t` | Swin Transformer Tiny (ImageNet) | Transfer learning: new head + fine-tuning. |
+All three are implemented in [`class_identification.py`](class_identification.py), so the full
+experimentation process can be reproduced, not just the best model.
 
-## Repository contents
+| Key | Model | How it is trained |
+|-----|-------|-------------------|
+| `custom_cnn` | CNN built from scratch | 5 × [conv-BN-ReLU + max-pool] → global average pool → dropout → linear head (~1.6M params). |
+| `resnet18` | ResNet-18 (ImageNet) | Transfer learning: new linear head, backbone fine-tuned at 0.1× the head learning rate. |
+| `swin_t` | Swin Transformer Tiny (ImageNet) | Transfer learning: new head + gentle fine-tuning. |
+
+## What is in this repository
 
 ```
-class_identification.py   # all four models: data pipeline, training, tuning, prediction, plots
-make_report.py            # builds report.pdf from the results/ outputs
-report.pdf                # project report (methodology, results, figures, discussion)
+class_identification.py   # all three models: data pipeline, training, tuning, prediction, plots
+report.pdf                # project report (methodology, results, all figures, discussion)
 requirements.txt          # pinned dependencies
 README.md                 # this file
-results/                  # generated outputs (see below) — figures & CSVs committed, checkpoints are not
+results/                  # generated figures and CSVs (model checkpoints are not committed)
 ```
 
-The **dataset is not committed** (it is large). Place it next to the script as described below.
+The **dataset is not committed** (it is large). Place it next to the script as shown below.
 
 ## Dataset layout
 
@@ -39,12 +39,12 @@ IE7615 Deep Learning for AI/
 ├── images_OBJ001/
 │   ├── OBJ001_001.jpg
 │   ├── OBJ001_002.jpg
-│   └── OBJ001_bg_001.jpg      # background-only (included in splits by default)
+│   └── OBJ001_bg_001.jpg      # background-only (kept in the splits by default)
 ├── images_OBJ002/
 └── … images_OBJ073/
 ```
 
-Point the script at a different location with `--data-dir /path/to/data`.
+Point the script at a different folder with `--data-dir /path/to/data`.
 
 ## Setup
 
@@ -54,16 +54,16 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-The code auto-selects the compute device: **CUDA → Apple MPS → CPU** (override with `--device`).
-On first run it downloads the ImageNet weights for the three pretrained backbones.
+The code picks the device automatically (**CUDA → Apple MPS → CPU**, override with `--device`).
+On the first run it downloads the ImageNet weights for the two pretrained backbones.
 
 ## How to run
 
 ```bash
-# Train + compare all four models (main experiment)
+# Train and compare all three models (main experiment)
 python class_identification.py compare
 
-# Optuna architecture/hyperparameter search for the custom CNN
+# Optuna architecture / hyperparameter search for the custom CNN
 python class_identification.py tune_cnn
 
 # Grid-search hyperparameters for the best model
@@ -76,36 +76,30 @@ python class_identification.py all
 python class_identification.py predict path/to/image.jpg
 ```
 
-Useful flags: `--models custom_cnn resnet18 …` (subset), `--epochs N` (override for quick runs),
+Useful flags: `--models custom_cnn resnet18 swin_t` (pick a subset), `--epochs N` (quick runs),
 `--no-include-bg` (drop background images), `--device cpu|mps|cuda`, `--data-dir PATH`.
 
 ## Outputs (written to `results/`)
 
-- `comparison.csv` / `comparison.png` — per-model accuracy, F1, params, latency
-- `curves.png` — training/validation accuracy & loss curves
+- `comparison.csv` / `comparison.png` — accuracy, F1, params and latency per model
+- `curves.png` — training and validation accuracy/loss curves
 - `confusion_<model>.png` — per-model confusion matrices
+- `efficiency.png`, `train_time.png`, `val_test_gap.png`, `perclass_acc.png`, `dataset_samples.png`,
+  `class_distribution.png` — the extra comparison figures used in the report
 - `history_<model>.csv` — per-epoch metrics
-- `<model>.pt`, `best_model.pt` — saved checkpoints (not committed; regenerated by training)
+- `<model>.pt`, `best_model.pt` — checkpoints (not committed; regenerated by training)
 
 ## Results
 
 Held-out test set (73 classes, same stratified split for every model), ranked by validation accuracy.
-Latency is single-image CPU inference, measured uniformly for a fair comparison.
+Latency is single-image CPU inference, measured the same way for all models.
 
 | Model | Val acc | Test acc | Test F1 | Params (M) | Latency (ms) | Best epoch |
 |---|---|---|---|---|---|---|
-| **Swin-Tiny** 🏆 | **0.962** | **0.948** | **0.949** | 27.6 | 29.1 | 7 |
+| **Swin-Tiny** | **0.962** | **0.948** | **0.949** | 27.6 | 29.1 | 7 |
 | ResNet-18 | 0.945 | 0.936 | 0.936 | 11.2 | 10.3 | 14 |
 | Custom CNN | 0.799 | 0.789 | 0.788 | 1.6 | 7.8 | 39 |
 
-**Takeaways:** ImageNet transfer learning (Swin-Tiny 94.8%, ResNet-18 93.6%) far outperforms the
-from-scratch Custom CNN (78.9%) when each class has only ~100 images. Swin-Tiny is the most accurate;
-ResNet-18 is the best accuracy-per-cost model (≈1 point behind, 2.4× fewer params, ~3× faster).
-
-See [`report.pdf`](report.pdf) for the full write-up (methodology, figures, discussion) and
-`results/comparison.png`, `results/curves.png`, `results/confusion_*.png` for the figures.
-
-> **Note on EfficientNet-B0:** it is implemented and tested (code included), but is omitted from the
-> results table — it hangs on this machine's Apple MPS GPU backend (a known PyTorch issue) and is
-> prohibitively slow on CPU (~30 min/epoch). Partial runs reached ~0.93 val accuracy, in line with the
-> other transfer models. See the report's *Limitations* section.
+ImageNet transfer learning clearly wins when each class has only ~100 images. Swin-Tiny is the most
+accurate; ResNet-18 is nearly as good while being smaller and faster, which makes it the best choice
+when speed or size matters. See [`report.pdf`](report.pdf) for the full write-up and all figures.
