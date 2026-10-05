@@ -102,4 +102,5 @@ Latency is single-image CPU inference, measured the same way for all models.
 
 ImageNet transfer learning clearly wins when each class has only ~100 images. Swin-Tiny is the most
 accurate; ResNet-18 is nearly as good while being smaller and faster, which makes it the best choice
-when speed or size matters. See [`report.pdf`](report.pdf) for the full write-up and all figures.
+when speed or size matters. See [`report_group9.pdf`](report_group9.pdf) for the full write-up and all figures.
+------
