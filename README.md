@@ -1,98 +1,90 @@
-# Discriminative Project — Milestone 1 (Study Group 9)
+# Discriminative Project (Study Group 9)
 
-Single-object image identification across **73 object classes** (`OBJ001` … `OBJ073`).
-Given a 224×224 photo, the model predicts which object it shows. We train one CNN from
-scratch and two ImageNet-pretrained backbones (transfer learning), then compare them on a
-held-out test split.
+Two milestones over the same **73 object classes** (`OBJ001` … `OBJ073`):
+
+- **Milestone 1 — single-object identification.** Given a 224×224 photo, predict which object it shows. A CNN from scratch plus three ImageNet-pretrained backbones (transfer learning), compared on a held-out test split.
+- **Milestone 2 — multi-object detection.** Single-object photos are auto-labelled with one tight box each, concatenated into multi-object composites, and a **YOLOv8** detector is trained to report the ID **and location** of every object in an image.
 
 **Repository:** https://github.com/Sneha0504/ie7615-object-identification
 
-## Models
-
-All three are implemented in [`class_identification.py`](class_identification.py), so the full
-experimentation process can be reproduced, not just the best model.
-
-| Key | Model | How it is trained |
-|-----|-------|-------------------|
-| `custom_cnn` | CNN built from scratch | 5 × [conv-BN-ReLU + max-pool] → global average pool → dropout → linear head (~1.6M params). |
-| `resnet18` | ResNet-18 (ImageNet) | Transfer learning: new linear head, backbone fine-tuned at 0.1× the head learning rate. |
-| `swin_t` | Swin Transformer Tiny (ImageNet) | Transfer learning: new head + gentle fine-tuning. |
-
-## What is in this repository
-
-```
-class_identification.py   # all three models: data pipeline, training, tuning, prediction, plots
-report.pdf                # project report (methodology, results, all figures, discussion)
-requirements.txt          # pinned dependencies
-README.md                 # this file
-results/                  # generated figures and CSVs (model checkpoints are not committed)
-```
-
-The **dataset is not committed** (it is large). Place it next to the script as shown below.
-
-## Dataset layout
-
-One folder per class, each holding ~100 JPEGs (plus optional `*_bg_*` background-only shots):
-
-```
-IE7615 Deep Learning for AI/
-├── images_OBJ001/
-│   ├── OBJ001_001.jpg
-│   ├── OBJ001_002.jpg
-│   └── OBJ001_bg_001.jpg      # background-only (kept in the splits by default)
-├── images_OBJ002/
-└── … images_OBJ073/
-```
-
-Point the script at a different folder with `--data-dir /path/to/data`.
-
-## Setup
+## Quick start
 
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt       # numpy stays < 2 on purpose — see the file's note
 ```
 
-The code picks the device automatically (**CUDA → Apple MPS → CPU**, override with `--device`).
-On the first run it downloads the ImageNet weights for the two pretrained backbones.
+Then download the data (below) and run the step you want. Device is picked automatically: **CUDA → Apple MPS → CPU**.
 
-## How to run
+## What is in this repository
+
+```
+class_identification.py    # M1: image cleaning, 4-model train/compare/tune, prediction, plots
+annotate_single_object.py  # M2 step 1: auto-label each single-object photo with one box (YOLOE + DINOv2 + classifier)
+generate_dataset.py        # M2 layout engine (make_layout / rectangles) + a standalone 4-class generator
+generate_multi_object.py   # M2 step 2: concatenate single-object photos into the YOLO detection dataset
+train_yolo_detector.py     # M2 step 3: train / evaluate / predict with YOLOv8
+requirements.txt           # pinned dependencies
+report_group9.pdf          # project report
+results/                   # M1 figures and CSVs (model checkpoints are gitignored)
+```
+
+Every script is **configured by the constants at the top of the file** and run with no arguments
+(e.g. `python train_yolo_detector.py`); edit `RUN_MODE` / paths there to change behaviour.
+
+## Data (not in git — download separately)
+
+The datasets and model weights are several GB and exceed GitHub's limits, so they are **not committed**.
+Download them from the team's shared Google Drive and place them exactly as below:
+
+```
+photo/
+├── IE7615 Deep Learning for AI/      # raw 73-class photos (images_OBJ001 … images_OBJ073)
+├── single_object_labels/             # per-object boxes produced by annotate_single_object.py
+└── multi_object/
+    └── multi_object_det_10000/       # the YOLO detection dataset (images/, labels/, data.yaml, …)
+```
+
+> **Drive:** raw photos — https://drive.google.com/drive/folders/1GKLyP17tm5JC0XENv25GeoGgYynm97LS
+> The prebuilt `single_object_labels/` and `multi_object_det_10000/` datasets are shared as archives on
+> the same Drive; unzip them into `photo/` as shown above. (They cannot be regenerated without the
+> Milestone-1 classifier run, so download the prebuilt versions to train the detector directly.)
+
+## Milestone 2 — train the detector (the main deliverable)
+
+The detection dataset is already built, so you only need to train:
 
 ```bash
-# Train and compare all three models (main experiment)
-python class_identification.py compare
-
-# Optuna architecture / hyperparameter search for the custom CNN
-python class_identification.py tune_cnn
-
-# Grid-search hyperparameters for the best model
-python class_identification.py tune
-
-# Full pipeline: tune_cnn -> compare -> tune
-python class_identification.py all
-
-# Identify a single image with the saved best model
-python class_identification.py predict path/to/image.jpg
+python train_yolo_detector.py          # RUN_MODE="all": train, then evaluate on the test split
 ```
 
-Useful flags: `--models custom_cnn resnet18 swin_t` (pick a subset), `--epochs N` (quick runs),
-`--no-include-bg` (drop background images), `--device cpu|mps|cuda`, `--data-dir PATH`.
+Edit the constants at the top of `train_yolo_detector.py` to change modes:
+- `RUN_MODE="predict"`, `WEIGHTS="<path>/best.pt"`, `PREDICT_IMAGES=["img.jpg", ...]` — detect objects in new
+  images; prints each object's **ID + box (x0,y0,x1,y1) + confidence** and saves annotated images.
+- `RUN_MODE="eval"` — evaluate an existing `best.pt` on the multi-object test split.
 
-## Outputs (written to `results/`)
+Training writes to `results_yolo/run_<timestamp>/`; the best checkpoint is `weights/best.pt`.
+On the first run it downloads `yolov8s.pt` automatically.
 
-- `comparison.csv` / `comparison.png` — accuracy, F1, params and latency per model
-- `curves.png` — training and validation accuracy/loss curves
-- `confusion_<model>.png` — per-model confusion matrices
-- `efficiency.png`, `train_time.png`, `val_test_gap.png`, `perclass_acc.png`, `dataset_samples.png`,
-  `class_distribution.png` — the extra comparison figures used in the report
-- `history_<model>.csv` — per-epoch metrics
-- `<model>.pt`, `best_model.pt` — checkpoints (not committed; regenerated by training)
+### Rebuilding the dataset from scratch (optional)
+1. `python class_identification.py` — trains the M1 classifier, writing a run to `results_ie7615/run_<ts>/`.
+2. Point `CLEAN_RUN` in `annotate_single_object.py` at that run, then `python annotate_single_object.py` — writes `photo/single_object_labels/`.
+3. `python generate_multi_object.py` — writes `photo/multi_object/multi_object_det_10000/`.
 
-## Results
+## Milestone 1 — single-object classifier
+
+```bash
+python class_identification.py          # runs the configured pipeline end-to-end
+```
+
+Models (`custom_cnn`, `resnet18`, `efficientnet_b0`, `swin_t`) and switches
+(`RUN_CNN_SEARCH`, `RUN_BEST_MODEL_SEARCH`, `EPOCHS_OVERRIDE`, `RESUME_DIR`) are set at the top of the file.
+Outputs go to `results_ie7615/run_<timestamp>/` (comparison CSVs, curves, confusion matrices, checkpoints).
+
+### Milestone-1 results
 
 Held-out test set (73 classes, same stratified split for every model), ranked by validation accuracy.
-Latency is single-image CPU inference, measured the same way for all models.
 
 | Model | Val acc | Test acc | Test F1 | Params (M) | Latency (ms) | Best epoch |
 |---|---|---|---|---|---|---|
@@ -100,7 +92,4 @@ Latency is single-image CPU inference, measured the same way for all models.
 | ResNet-18 | 0.945 | 0.936 | 0.936 | 11.2 | 10.3 | 14 |
 | Custom CNN | 0.799 | 0.789 | 0.788 | 1.6 | 7.8 | 39 |
 
-ImageNet transfer learning clearly wins when each class has only ~100 images. Swin-Tiny is the most
-accurate; ResNet-18 is nearly as good while being smaller and faster, which makes it the best choice
-when speed or size matters. See [`report_group9.pdf`](report_group9.pdf) for the full write-up and all figures.
-------
+See [`report_group9.pdf`](report_group9.pdf) for the full write-up and all figures.
