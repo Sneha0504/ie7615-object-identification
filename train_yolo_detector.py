@@ -29,8 +29,8 @@ RESUME = None                      # interrupted run's last.pt path when RUN_MOD
 MODEL = "yolov8s.pt"                # COCO-pretrained start point (n/s/m/l/x)
 EPOCHS = 50
 PATIENCE = 10                       # early stop after this many epochs without val improvement
-IMGSZ = 640                         # composites have a 640 px long edge
-BATCH = 16
+IMGSZ = 896                         # balance of the TA's "match the largest grid" tip and MPS memory
+BATCH = 8
 FRACTION = 1.0                     # fraction of training images; smaller values are useful for quick runs
 WORKERS = min(8, os.cpu_count() or 1)  # image loading / augmentation processes
 SEED = 20261003
@@ -39,7 +39,7 @@ IOU_MATCH = 0.5                     # IoU needed for a prediction to count as a 
 DEVICE = "0" if torch.cuda.is_available() else "mps" if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else "cpu"
 
 HERE = Path(__file__).resolve().parent
-YOLO_DIR = HERE / "photo" / "multi_object" / "multi_object_det_10000"
+YOLO_DIR = HERE / "photo" / "multi_object" / "multi_object_grid_2500"
 SINGLE_DIR = HERE / "photo" / "single_object_labels"   # one box per photo; train/val/test.txt follow the same split
 RUNS_DIR = HERE / "results_yolo"
 MOSAIC = 1.0                        # share of training images built as 4-image mosaics (Ultralytics default)
@@ -83,9 +83,9 @@ def train(data_yaml):
     model = YOLO(MODEL)
     name = datetime.now().strftime("run_%m%d%Y_%H%M%S") + ("_single" if INCLUDE_SINGLE else "")
     model.train(data=str(data_yaml), epochs=EPOCHS, patience=PATIENCE, imgsz=IMGSZ,
-                batch=BATCH, workers=WORKERS, device=DEVICE, seed=SEED, deterministic=True,
+                batch=BATCH, workers=WORKERS, device=DEVICE, seed=SEED, deterministic=False,
                 project=str(RUNS_DIR), name=name, pretrained=True, optimizer="auto", cos_lr=True,
-                fraction=FRACTION, mosaic=MOSAIC, plots=True, exist_ok=False)
+                fraction=FRACTION, mosaic=MOSAIC, plots=True, exist_ok=False, amp=False)
     return Path(model.trainer.save_dir) / "weights" / "best.pt"
 
 
