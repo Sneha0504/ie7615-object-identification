@@ -22,6 +22,7 @@ results/*.pt
 results_yolo/
 runs/
 grid_outputs/
+live_demo/
 
 # Optuna study DBs
 *.db
